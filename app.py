@@ -1,8 +1,11 @@
-from flask import Flask, request, render_template, send_file, redirect, url_for
+from flask import Flask, request, render_template, send_file, redirect, url_for, after_this_request
 import os
 import cv2
 import zipfile
 import uuid
+import shutil
+import threading
+import time
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
@@ -38,12 +41,13 @@ def upload_files():
     for file in files:
         if file.filename != '':
             filename = secure_filename(file.filename)
-            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(file_path)
+            print(f"Uploaded file: {filename}")
     return redirect(url_for('apply_watermark'))
 
 @app.route('/apply_watermark')
 def apply_watermark():
-    # Use the original script logic for watermarking
     alpha = 0.8
     processed_files = []
     output_dir = os.path.join(PROCESSED_FOLDER, str(uuid.uuid4()))
@@ -54,6 +58,7 @@ def apply_watermark():
         if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tiff')):
             image = cv2.imread(file_path)
             if image is None:
+                print(f"Error reading image {filename}")
                 continue
 
             # Resize watermark if necessary
@@ -66,29 +71,40 @@ def apply_watermark():
             processed_image_path = os.path.join(output_dir, f'processed_{filename}')
             cv2.imwrite(processed_image_path, processed_image)
             processed_files.append(processed_image_path)
+            print(f"Watermarked image saved: {processed_image_path}")
 
     # Create a ZIP file with processed images
     zip_path = os.path.join(PROCESSED_FOLDER, f"watermarked_images_{uuid.uuid4()}.zip")
-    with zipfile.ZipFile(zip_path, 'w') as zipf:
-        for file in processed_files:
-            zipf.write(file, os.path.basename(file))
+    shutil.make_archive(zip_path.replace('.zip', ''), 'zip', output_dir)
+    print(f"Zipped processed images to: {zip_path}")
 
-    # Clean up uploaded files
-    for file in os.listdir(UPLOAD_FOLDER):
-        os.remove(os.path.join(UPLOAD_FOLDER, file))
+    # Schedule cleanup after the response is sent
+    @after_this_request
+    def cleanup(response):
+        # Clean up uploaded files
+        for file in os.listdir(UPLOAD_FOLDER):
+            file_path = os.path.join(UPLOAD_FOLDER, file)
+            os.remove(file_path)
+            print(f"Deleted uploaded file: {file}")
+
+        # Clean up processed files and directory
+        shutil.rmtree(output_dir)
+        print(f"Deleted processed folder: {output_dir}")
+
+        # Use a thread to delete the zip file after a short delay
+        threading.Thread(target=delayed_delete, args=(zip_path,)).start()
+
+        return response
 
     return send_file(zip_path, as_attachment=True, download_name='watermarked_images.zip', mimetype='application/zip')
 
-@app.after_request
-def delete_processed_folders(response):
-    # Clean up processed files and folders
-    for folder in os.listdir(PROCESSED_FOLDER):
-        folder_path = os.path.join(PROCESSED_FOLDER, folder)
-        if os.path.isdir(folder_path):
-            for file in os.listdir(folder_path):
-                os.remove(os.path.join(folder_path, file))
-            os.rmdir(folder_path)
-    return response
+def delayed_delete(file_path):
+    time.sleep(5)  # Wait for 5 seconds before deleting
+    try:
+        os.remove(file_path)
+        print(f"Deleted zip file: {file_path}")
+    except Exception as e:
+        print(f"Error deleting zip file: {e}")
 
 if __name__ == "__main__":
     app.run()

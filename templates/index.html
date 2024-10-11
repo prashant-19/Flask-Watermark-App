@@ -3,6 +3,69 @@
 <head>
     <meta charset="UTF-8">
     <title>Watermark Images</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        form {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: bold;
+            color: #555;
+        }
+
+        input[type="file"] {
+            margin-bottom: 15px;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            background-color: #007BFF;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+    <script>
+        // Function to keep the server awake
+        function keepAlive() {
+            setInterval(() => {
+                fetch('/');  // Sends a request to the root URL to keep the server active
+                console.log("Pinged the server to keep it awake");
+            }, 1800000); // 30 minutes in milliseconds
+        }
+
+        // Start pinging when the page loads
+        window.onload = keepAlive;
+    </script>
 </head>
 <body>
     <h1>Watermark Images</h1>
